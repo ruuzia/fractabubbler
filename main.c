@@ -29,24 +29,42 @@ static inline bool point_filled(const Img img, int x, int y) {
     return is_within_bounds(img, x, y) && img.data[x + y * img.stride];
 }
 
-static inline bool point_filled2(Img img, int x, int y) {
-    bool result = is_within_bounds(img, x, y) && img.data[x + y * img.stride];
-    if (result) img.data[x + y * img.stride] = 127;
-    return result;
-}
-static int get_solid_radius2(const Img img, int x, int y) {
-    int r;
-    // For simplicity and performance, just check outward in
-    // the four cardinal directions
-    for (r = 0;
-            point_filled2(img, x + r, y) &&
-            point_filled2(img, x - r, y) &&
-            point_filled2(img, x, y + r) &&
-            point_filled2(img, x, y - r); r++) ;
-    return r;
+static double distsq(int x0, int y0, int x1, int y1) {
+    int x = x1 - x0;
+    int y = y1 - y0;
+    return x*x + y*y;
 }
 
-static int get_solid_radius(const Img img, int x, int y) {
+
+static inline int min(int a, int b) {
+    return a < b ? a : b;
+}
+
+
+static double get_filled_radius(const Img img, int px, int py) {
+    // Shortcut
+    if (!img.data[px + py*img.stride]) return 0;
+
+    int room_left = px;
+    int room_right = img.width - px - 1;
+    int room_up = py;
+    int room_down = img.height - py - 1;
+
+    const double max_dist = min(min(min(room_left, room_right), room_down), room_up);
+
+    double shortest_distsq = max_dist*max_dist;
+    for (int x = 0; x < img.width; x++) {
+        for (int y = 0; y < img.height; y++) {
+            if (img.data[x + y*img.stride]) continue;
+            double d = distsq(x, y, px, py);
+            if (d < shortest_distsq) shortest_distsq = d;
+        }
+    }
+
+    return sqrt(shortest_distsq);
+}
+
+static int get_filled_radius_old(const Img img, int x, int y) {
     int r;
     // For simplicity and performance, just check outward in
     // the four cardinal directions
@@ -62,7 +80,7 @@ static int find_greatest_radius(const Img img, int *const out_x, int *const out_
     int greatest_radius = 0;
     for (int x = 0; x < img.width; x++) {
         for (int y = 0; y < img.height; y++) {
-            int r = get_solid_radius(img, x, y);
+            int r = get_filled_radius(img, x, y);
             if (r > greatest_radius) {
                 greatest_radius = r;
                 *out_x = x;
@@ -70,7 +88,7 @@ static int find_greatest_radius(const Img img, int *const out_x, int *const out_
             }
         }
     }
-
+    printf("greatest_radius=%d\n", greatest_radius);
     return greatest_radius;
 }
 
@@ -85,6 +103,8 @@ void fractabubble(const char *glyph, const char *file_name) {
 
     cairo_show_text(cr, glyph);
     cairo_surface_flush(surface);
+
+    //cairo_surface_write_to_png(surface, "before.png");
 
     cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 
@@ -113,17 +133,22 @@ void fractabubble(const char *glyph, const char *file_name) {
         cairo_set_source_rgba (cr, 0, 0, 0, 0.0);
         cairo_fill(cr);
         cairo_surface_flush(surface);
-
     }
 
     fprintf(svg, "</svg>\n");
     fclose(svg);
+    //cairo_surface_write_to_png(surface, "after.png");
     
     cairo_destroy (cr);
     cairo_surface_destroy (surface);
 }
 
 int main(void) {
+    fractabubble("a", "a.svg");
+    return 0;
+}
+
+int main2(void) {
     for (char c = 'a'; c <= 'z'; c++) {
         char glyph[] = { c, '\0' };
         char file_name[256];
