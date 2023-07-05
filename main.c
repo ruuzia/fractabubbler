@@ -9,10 +9,16 @@
 #define FONT_WIDTH  0.6
 #define FONT_HEIGHT 0.68
 
+#define WIDTH_HEIGHT_RATIO 0.6
+
 #define HEIGHT 256
-#define WIDTH  ((int)(HEIGHT * FONT_WIDTH / FONT_HEIGHT))
+#define WIDTH  (HEIGHT * WIDTH_HEIGHT_RATIO)
+#define BASE_HEIGHT 60
 
 #define MIN_RADIUS 5
+#define MAX_RADIUS 40
+
+#define DBG_PNG
 
 typedef struct {
     uint8_t *data;
@@ -41,7 +47,11 @@ static inline int min(int a, int b) {
 }
 
 
-static double get_filled_radius(const Img img, int px, int py) {
+// Optimization
+//
+static double cache_greatest_radius;
+
+static double get_filled_radius2(const Img img, int px, int py) {
     // Shortcut
     if (!img.data[px + py*img.stride]) return 0;
 
@@ -50,11 +60,11 @@ static double get_filled_radius(const Img img, int px, int py) {
     int room_up = py;
     int room_down = img.height - py - 1;
 
-    const double max_dist = min(min(min(room_left, room_right), room_down), room_up);
+    const double max_dist = min(min(min(min(cache_greatest_radius, room_left), room_right), room_down), room_up);
 
     double shortest_distsq = max_dist*max_dist;
-    for (int x = 0; x < img.width; x++) {
-        for (int y = 0; y < img.height; y++) {
+    for (int x = px - max_dist; x <= px + max_dist; x++) {
+        for (int y = py - max_dist; y <= py + max_dist; y++) {
             if (img.data[x + y*img.stride]) continue;
             double d = distsq(x, y, px, py);
             if (d < shortest_distsq) shortest_distsq = d;
@@ -64,23 +74,11 @@ static double get_filled_radius(const Img img, int px, int py) {
     return sqrt(shortest_distsq);
 }
 
-static int get_filled_radius_old(const Img img, int x, int y) {
-    int r;
-    // For simplicity and performance, just check outward in
-    // the four cardinal directions
-    for (r = 0;
-            point_filled(img, x + r, y) &&
-            point_filled(img, x - r, y) &&
-            point_filled(img, x, y + r) &&
-            point_filled(img, x, y - r); r++) ;
-    return r;
-}
-
 static int find_greatest_radius(const Img img, int *const out_x, int *const out_y) {
-    int greatest_radius = 0;
+    double greatest_radius = 0;
     for (int x = 0; x < img.width; x++) {
         for (int y = 0; y < img.height; y++) {
-            int r = get_filled_radius(img, x, y);
+            double r = get_filled_radius2(img, x, y);
             if (r > greatest_radius) {
                 greatest_radius = r;
                 *out_x = x;
@@ -88,7 +86,7 @@ static int find_greatest_radius(const Img img, int *const out_x, int *const out_
             }
         }
     }
-    printf("greatest_radius=%d\n", greatest_radius);
+    cache_greatest_radius = greatest_radius;
     return greatest_radius;
 }
 
@@ -98,13 +96,17 @@ void fractabubble(const char *glyph, const char *file_name) {
     cairo_t *cr = cairo_create(surface);
 
     cairo_select_font_face(cr, "Liberation Mono", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, HEIGHT / FONT_HEIGHT);
-    cairo_move_to (cr, 0, HEIGHT);
+    cairo_set_font_size(cr, WIDTH / FONT_WIDTH);
+    cairo_matrix_t matrix = {0};
+    cairo_get_font_matrix(cr, &matrix);
+    cairo_move_to (cr, 0, HEIGHT - BASE_HEIGHT);
 
     cairo_show_text(cr, glyph);
     cairo_surface_flush(surface);
 
-    //cairo_surface_write_to_png(surface, "before.png");
+#ifdef DBG_PNG
+    cairo_surface_write_to_png(surface, "before.png");
+#endif
 
     cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 
@@ -118,6 +120,8 @@ void fractabubble(const char *glyph, const char *file_name) {
     FILE *svg = fopen(file_name, "w");
     fprintf(svg, "<?xml version=\"1.0\"?>\n");
     fprintf(svg, "<svg width=\"%d\" height=\"%d\">\n", img.width, img.height);
+
+    cache_greatest_radius = MAX_RADIUS;
 
     int greatest_radius;
     while (true) {
@@ -137,26 +141,31 @@ void fractabubble(const char *glyph, const char *file_name) {
 
     fprintf(svg, "</svg>\n");
     fclose(svg);
-    //cairo_surface_write_to_png(surface, "after.png");
+
+#ifdef DBG_PNG
+    cairo_surface_write_to_png(surface, "after.png");
+#endif
     
     cairo_destroy (cr);
     cairo_surface_destroy (surface);
 }
 
-int main(void) {
-    fractabubble("a", "a.svg");
+void literal(char c) {
+    char glyph[] = { c, '\0' };
+    char file_name[256];
+    sprintf(file_name, "glyphs/%c.svg", c);
+    printf("%s :: %s\n", glyph, file_name);
+    fractabubble(glyph, file_name);
+}
+
+int main0(void) {
+    fractabubble("t", "a.svg");
     return 0;
 }
 
-int main2(void) {
-    for (char c = 'a'; c <= 'z'; c++) {
-        char glyph[] = { c, '\0' };
-        char file_name[256];
-        sprintf(file_name, "glyphs/%c.svg", c);
-        printf("%s :: %s\n", glyph, file_name);
-        fractabubble(glyph, file_name);
-
-    }
+int main(void) {
+    for (char c = 'a'; c <= 'z'; c++) literal(c);
+    for (char c = 'A'; c <= 'Z'; c++) literal(c);
 
     return 0;
 }
