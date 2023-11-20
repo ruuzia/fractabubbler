@@ -159,7 +159,7 @@ void fractabubble(const char *glyph, const char *file_name) {
     cairo_surface_destroy (surface);
 }
 
-void named(const char *glyph, const char *name) {
+static void named(const char *glyph, const char *name) {
     char file_name[256] = "glyphs/";
     strcat(file_name, name);
     strcat(file_name, ".svg");
@@ -167,7 +167,7 @@ void named(const char *glyph, const char *name) {
     fractabubble(glyph, file_name);
 }
 
-void literal(char c) {
+static void literal(char c) {
     char glyph[] = { c, '\0' };
     named(glyph, glyph);
 }
