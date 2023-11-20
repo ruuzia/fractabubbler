@@ -1,3 +1,10 @@
+/*
+* Author: Rustum Zia
+* This script is created to generate fonts that can be easiliy
+* rendered in Bubbl <https://github.com/ruuzia/bubbl>.
+* What that is is a set of SVG files containing only circles.
+*/
+
 #include <math.h>
 #include <stdio.h>
 #include <cairo/cairo.h>
@@ -89,6 +96,41 @@ static int find_greatest_radius(const Img img, int *const out_x, int *const out_
     }
     cache_greatest_radius = greatest_radius;
     return greatest_radius;
+}
+
+
+#include <stdio.h>
+#define STB_TRUETYPE_IMPLEMENTATION  // force following include to generate implementation
+#include "stb_truetype.h"
+
+#define SIZE (1<<25)
+unsigned char ttf_buffer[SIZE];
+
+int main(int argc, char **argv) {
+    stbtt_fontinfo font;
+    unsigned char *bitmap;
+    int c = 'a', s = 20;
+    
+    FILE* f = fopen("/usr/share/fonts/liberation-mono/LiberationMono-Regular.ttf", "rb");
+    fread(ttf_buffer, 1, SIZE, f);
+    fclose(f);
+    
+    stbtt_InitFont(&font, ttf_buffer, stbtt_GetFontOffsetForIndex(ttf_buffer,0));
+    float scale = stbtt_ScaleForPixelHeight(&font, s);
+    
+    int w,h;
+    bitmap = stbtt_GetCodepointBitmap(&font, 0, scale, c, &w, &h, 0,0);
+
+    printf("s: %d, w: %d, h: %d\n", s, w, h);
+
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            putchar(" .:ioVM@"[bitmap[y*w+x]>>5]);
+        }
+        putchar('\n');
+    }
+
+    return 0;
 }
 
 void fractabubble(const char *glyph, const char *file_name) {
@@ -184,7 +226,7 @@ int main1(void) {
     return 0;
 }
 
-int main(void) {
+int main0(void) {
     atlas = fopen("glyphs/atlas", "w");
 
     named(" ", "_space");
