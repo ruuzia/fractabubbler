@@ -159,11 +159,19 @@ void fractabubble(const char *glyph, const char *file_name) {
     cairo_surface_destroy (surface);
 }
 
+static FILE *atlas = NULL;
+
+static void addToAtlas(const char *glyph, const char *file_name) {
+    assert(atlas);
+    printf("%s :: %s\n", glyph, file_name);
+    fprintf(atlas, "\n%s\n%s\n", file_name, glyph);
+}
+
 static void named(const char *glyph, const char *name) {
     char file_name[256] = "glyphs/";
     strcat(file_name, name);
     strcat(file_name, ".svg");
-    printf("%s :: %s\n", glyph, file_name);
+    addToAtlas(glyph, file_name);
     fractabubble(glyph, file_name);
 }
 
@@ -178,6 +186,8 @@ int main1(void) {
 }
 
 int main(void) {
+    atlas = fopen("glyphs/atlas", "w");
+
     named(" ", "_space");
     named(".", "_period");
     named(":", "_colon");
@@ -196,5 +206,6 @@ int main(void) {
     for (char c = 'a'; c <= 'z'; c++) literal(c);
     for (char c = 'A'; c <= 'Z'; c++) literal(c);
 
+    fclose(atlas);
     return 0;
 }
