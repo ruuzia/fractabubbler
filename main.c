@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <string.h>
+#include <time.h>
 
 #define FONT_WIDTH  0.6
 #define FONT_HEIGHT 0.68
@@ -130,13 +132,20 @@ void fractabubble(const char *glyph, const char *file_name) {
         if (greatest_radius < MIN_RADIUS) break;
 
 
-        fprintf(svg, "  <circle cx=\"%d\" cy=\"%d\" r=\"%d\" fill=\"#800080\" />\n", x_greatest, y_greatest, greatest_radius);
+        fprintf(svg, "  <circle cx=\"%d\" cy=\"%d\" r=\"%d\" fill=\"#800080\" />\n", x_greatest, y_greatest, greatest_radius-1);
 
         cairo_move_to (cr, x_greatest, y_greatest);
         cairo_arc(cr, x_greatest, y_greatest, greatest_radius-1, 0, 2*M_PI);
         cairo_set_source_rgba (cr, 0, 0, 0, 0.0);
         cairo_fill(cr);
         cairo_surface_flush(surface);
+
+#ifdef DBG_PNG___
+        cairo_surface_write_to_png(surface, "after.png");
+        double seconds = 0.1;
+        struct timespec req = { .tv_nsec = 1e9 * seconds };
+        nanosleep(&req, NULL);
+#endif
     }
 
     fprintf(svg, "</svg>\n");
@@ -158,12 +167,35 @@ void literal(char c) {
     fractabubble(glyph, file_name);
 }
 
-int main0(void) {
-    fractabubble("t", "a.svg");
+void named(const char *glyph, const char *name) {
+    char file_name[256] = "glyphs/";
+    strcat(file_name, name);
+    strcat(file_name, ".svg");
+    printf("%s :: %s\n", glyph, file_name);
+    fractabubble(glyph, file_name);
+}
+
+int main1(void) {
+    fractabubble("m", "a.svg");
     return 0;
 }
 
 int main(void) {
+    named(" ", "_space");
+    named(".", "_period");
+    named(":", "_colon");
+    named(",", "_comma");
+    named(";", "_semicolon");
+    named("(", "_openparenthesis");
+    named(")", "_closeparenthesis");
+    named("[", "_opensquarebrackets");
+    named("]", "_closesquarebrackets");
+    named("*", "_star");
+    named("!", "_exclamation");
+    named("?", "_question");
+    named("\'", "_singlequote");
+    named("\"", "_doublequote");
+    for (char c = '0'; c <= '9'; c++) literal(c);
     for (char c = 'a'; c <= 'z'; c++) literal(c);
     for (char c = 'A'; c <= 'Z'; c++) literal(c);
 
