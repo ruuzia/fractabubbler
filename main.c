@@ -1,4 +1,3 @@
-#include <cairo/cairo-deprecated.h>
 #include <math.h>
 #include <stdio.h>
 #include <cairo/cairo.h>
