@@ -27,10 +27,12 @@
 #define WIDTH  (HEIGHT * WIDTH_HEIGHT_RATIO)
 #define BASE_HEIGHT 60
 
-#define MIN_RADIUS 5
+#define IMG_SIZE 256
+#define MIN_RADIUS 4
 #define MAX_RADIUS 40
 
-#define DBG_PNG
+#define DBG_ASCII
+/* #define DBG_PNG */
 
 typedef struct {
     uint8_t *data;
@@ -110,9 +112,8 @@ static int find_greatest_radius(const Img img, int *const out_x, int *const out_
 #define SIZE (1<<25)
 unsigned char ttf_buffer[SIZE];
 
-Img rasterize(const char *file_name) {
+Img rasterize(const char *file_name, int c, int height) {
     stbtt_fontinfo font;
-    int c = 'a', height = 32;
 
     FILE* f = fopen(file_name, "rb");
     assert(f);
@@ -130,11 +131,11 @@ Img rasterize(const char *file_name) {
     stbtt_GetCodepointHMetrics(&font, c, &width, NULL);
     width = (int)(width * scale);
 
-    uint8_t* bitmap = malloc(width*height);
+    uint8_t* bitmap = calloc(width*height, 1);
 
     int x0,y0,x1,y1;
     stbtt_GetCodepointBitmapBox(&font, c, scale, scale, &x0, &y0, &x1, &y1);
-    /* printf("%d, %d, %d, %d", x0, y0, x1, y1); */
+    printf("%d, %d, %d, %d\n", x0, y0, x1, y1);
 
     int baseline = (int) (ascent*scale);
     stbtt_MakeCodepointBitmap(&font, &bitmap[(baseline + y0) * width + x0], x1-x0,y1-y0, width, scale,scale, c);
@@ -147,18 +148,25 @@ Img rasterize(const char *file_name) {
     };
 }
 
-int main(int argc, char **argv) {
-    stbtt_fontinfo font;
-
-    Img img = rasterize("/usr/share/fonts/liberation/Liberation-Regular.ttf");
-    
+void display_ascii(Img img) {
     for (int y = 0; y < img.height; y++) {
         for (int x = 0; x < img.width; x++) {
-            putchar(" .:ioVM@"[img.data[y*img.stride + x]>>5]);
+            int c = " .:*|oO@"[img.data[y*img.stride + x]>>5];
+            putchar(c);
+            putchar(c);
         }
         putchar('\n');
     }
 
+}
+
+int main2(int argc, char **argv) {
+    stbtt_fontinfo font;
+
+    Img img = rasterize("/usr/share/fonts/liberation-mono/LiberationMono-Regular.ttf", 'a', 32);
+
+    display_ascii(img);
+    
     /* for (int y = 0; y < h; y++) { */
     /*     for (int x = 0; x < w; x++) { */
     /*         printf("%3d ", bitmap[y*w + x]); */
@@ -196,6 +204,8 @@ void fractabubble(const char *glyph, const char *file_name) {
         .stride = cairo_image_surface_get_stride(surface),
     };
 
+    img = rasterize("/usr/share/fonts/liberation-mono/LiberationMono-Regular.ttf", glyph[0], IMG_SIZE);
+
     FILE *svg = fopen(file_name, "w");
     fprintf(svg, "<?xml version=\"1.0\"?>\n");
     fprintf(svg, "<svg width=\"%d\" height=\"%d\">\n", img.width, img.height);
@@ -208,16 +218,34 @@ void fractabubble(const char *glyph, const char *file_name) {
         greatest_radius = find_greatest_radius(img, &x_greatest, &y_greatest);
         if (greatest_radius < MIN_RADIUS) break;
 
-
         fprintf(svg, "  <circle cx=\"%d\" cy=\"%d\" r=\"%d\" fill=\"#800080\" />\n", x_greatest, y_greatest, greatest_radius-1);
 
-        cairo_move_to (cr, x_greatest, y_greatest);
-        cairo_arc(cr, x_greatest, y_greatest, greatest_radius-1, 0, 2*M_PI);
-        cairo_set_source_rgba (cr, 0, 0, 0, 0.0);
-        cairo_fill(cr);
-        cairo_surface_flush(surface);
+        /* cairo_move_to (cr, x_greatest, y_greatest); */
+        /* cairo_arc(cr, x_greatest, y_greatest, greatest_radius-1, 0, 2*M_PI); */
+        /* cairo_set_source_rgba (cr, 0, 0, 0, 0.0); */
+        /* cairo_fill(cr); */
+        /* cairo_surface_flush(surface); */
 
-#ifdef DBG_PNG___
+        // TODO: more optimal algorithm?
+        const int p_x = x_greatest, p_y = y_greatest, r = greatest_radius;
+        for (int j = -r; j < r; j++) {
+            for (int i = -r; i < r; i++) {
+                if (j*j + i*i < r*r) {
+                    img.data[(p_y + j) * img.stride + (p_x + i)] = 0;
+                }
+            }
+        }
+
+#ifdef DBG_ASCII
+        display_ascii(img);
+        fflush(stdout);
+        double seconds = 0.33;
+        struct timespec req = { .tv_nsec = 1e9 * seconds };
+        nanosleep(&req, NULL);
+#endif
+
+
+#ifdef DBG_PNG
         cairo_surface_write_to_png(surface, "after.png");
         double seconds = 0.1;
         struct timespec req = { .tv_nsec = 1e9 * seconds };
@@ -257,8 +285,8 @@ static void literal(char c) {
     named(glyph, glyph);
 }
 
-int main1(void) {
-    fractabubble("m", "a.svg");
+int main(void) {
+    fractabubble("a", "test.svg");
     return 0;
 }
 
