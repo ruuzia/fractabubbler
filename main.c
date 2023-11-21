@@ -5,6 +5,10 @@
 * What that is is a set of SVG files containing only circles.
 */
 
+// TODO: use stb_truetype in place of cairo
+// TODO: change script to be a program which only creates a single glyph
+//       the font can then be managed and parallelized by another program
+
 #include <math.h>
 #include <stdio.h>
 #include <cairo/cairo.h>
@@ -106,31 +110,63 @@ static int find_greatest_radius(const Img img, int *const out_x, int *const out_
 #define SIZE (1<<25)
 unsigned char ttf_buffer[SIZE];
 
-int main(int argc, char **argv) {
+Img rasterize(const char *file_name) {
     stbtt_fontinfo font;
-    unsigned char *bitmap;
-    int c = 'a', s = 20;
-    
-    FILE* f = fopen("/usr/share/fonts/liberation-mono/LiberationMono-Regular.ttf", "rb");
+    int c = 'a', height = 32;
+
+    FILE* f = fopen(file_name, "rb");
+    assert(f);
+
     fread(ttf_buffer, 1, SIZE, f);
     fclose(f);
     
     stbtt_InitFont(&font, ttf_buffer, stbtt_GetFontOffsetForIndex(ttf_buffer,0));
-    float scale = stbtt_ScaleForPixelHeight(&font, s);
+    float scale = stbtt_ScaleForPixelHeight(&font, height);
+
+    int ascent;
+    stbtt_GetFontVMetrics(&font, &ascent, NULL, NULL);
+
+    int width;
+    stbtt_GetCodepointHMetrics(&font, c, &width, NULL);
+    width = (int)(width * scale);
+
+    uint8_t* bitmap = malloc(width*height);
+
+    int x0,y0,x1,y1;
+    stbtt_GetCodepointBitmapBox(&font, c, scale, scale, &x0, &y0, &x1, &y1);
+    /* printf("%d, %d, %d, %d", x0, y0, x1, y1); */
+
+    int baseline = (int) (ascent*scale);
+    stbtt_MakeCodepointBitmap(&font, &bitmap[(baseline + y0) * width + x0], x1-x0,y1-y0, width, scale,scale, c);
+
+    return (Img) {
+        .data = bitmap,
+        .stride = width,
+        .width = width,
+        .height = height,
+    };
+}
+
+int main(int argc, char **argv) {
+    stbtt_fontinfo font;
+
+    Img img = rasterize("/usr/share/fonts/liberation/Liberation-Regular.ttf");
     
-    int w,h;
-    bitmap = stbtt_GetCodepointBitmap(&font, 0, scale, c, &w, &h, 0,0);
-
-    printf("s: %d, w: %d, h: %d\n", s, w, h);
-
-    for (int y = 0; y < h; y++) {
-        for (int x = 0; x < w; x++) {
-            putchar(" .:ioVM@"[bitmap[y*w+x]>>5]);
+    for (int y = 0; y < img.height; y++) {
+        for (int x = 0; x < img.width; x++) {
+            putchar(" .:ioVM@"[img.data[y*img.stride + x]>>5]);
         }
         putchar('\n');
     }
 
-    return 0;
+    /* for (int y = 0; y < h; y++) { */
+    /*     for (int x = 0; x < w; x++) { */
+    /*         printf("%3d ", bitmap[y*w + x]); */
+    /*     } */
+    /*     putchar('\n'); */
+    /* } */
+    /* return 0; */
+    free(img.data);
 }
 
 void fractabubble(const char *glyph, const char *file_name) {
