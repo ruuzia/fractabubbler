@@ -11,7 +11,6 @@
 
 #include <math.h>
 #include <stdio.h>
-#include <cairo/cairo.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <assert.h>
@@ -175,36 +174,11 @@ int main2(int argc, char **argv) {
     /* } */
     /* return 0; */
     free(img.data);
+    return 0;
 }
 
 void fractabubble(const char *glyph, const char *file_name) {
-    // Create rasterized glyph
-    cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_A8, WIDTH, HEIGHT);
-    cairo_t *cr = cairo_create(surface);
-
-    cairo_select_font_face(cr, "Liberation Mono", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, WIDTH / FONT_WIDTH);
-    cairo_matrix_t matrix = {0};
-    cairo_get_font_matrix(cr, &matrix);
-    cairo_move_to (cr, 0, HEIGHT - BASE_HEIGHT);
-
-    cairo_show_text(cr, glyph);
-    cairo_surface_flush(surface);
-
-#ifdef DBG_PNG
-    cairo_surface_write_to_png(surface, "before.png");
-#endif
-
-    cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
-
-    Img img = {
-        .data = cairo_image_surface_get_data(surface),
-        .width = cairo_image_surface_get_width(surface),
-        .height = cairo_image_surface_get_height(surface),
-        .stride = cairo_image_surface_get_stride(surface),
-    };
-
-    img = rasterize("/usr/share/fonts/liberation-mono/LiberationMono-Regular.ttf", glyph[0], IMG_SIZE);
+    Img img = rasterize("/usr/share/fonts/liberation-mono/LiberationMono-Regular.ttf", glyph[0], IMG_SIZE);
 
     FILE *svg = fopen(file_name, "w");
     fprintf(svg, "<?xml version=\"1.0\"?>\n");
@@ -219,12 +193,6 @@ void fractabubble(const char *glyph, const char *file_name) {
         if (greatest_radius < MIN_RADIUS) break;
 
         fprintf(svg, "  <circle cx=\"%d\" cy=\"%d\" r=\"%d\" fill=\"#800080\" />\n", x_greatest, y_greatest, greatest_radius-1);
-
-        /* cairo_move_to (cr, x_greatest, y_greatest); */
-        /* cairo_arc(cr, x_greatest, y_greatest, greatest_radius-1, 0, 2*M_PI); */
-        /* cairo_set_source_rgba (cr, 0, 0, 0, 0.0); */
-        /* cairo_fill(cr); */
-        /* cairo_surface_flush(surface); */
 
         // TODO: more optimal algorithm?
         const int p_x = x_greatest, p_y = y_greatest, r = greatest_radius;
@@ -245,23 +213,10 @@ void fractabubble(const char *glyph, const char *file_name) {
 #endif
 
 
-#ifdef DBG_PNG
-        cairo_surface_write_to_png(surface, "after.png");
-        double seconds = 0.1;
-        struct timespec req = { .tv_nsec = 1e9 * seconds };
-        nanosleep(&req, NULL);
-#endif
     }
 
     fprintf(svg, "</svg>\n");
     fclose(svg);
-
-#ifdef DBG_PNG
-    cairo_surface_write_to_png(surface, "after.png");
-#endif
-    
-    cairo_destroy (cr);
-    cairo_surface_destroy (surface);
 }
 
 static FILE *atlas = NULL;
