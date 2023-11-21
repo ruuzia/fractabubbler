@@ -5,7 +5,6 @@
 * What that is is a set of SVG files containing only circles.
 */
 
-// TODO: use stb_truetype in place of cairo
 // TODO: change script to be a program which only creates a single glyph
 //       the font can then be managed and parallelized by another program
 
@@ -17,21 +16,11 @@
 #include <string.h>
 #include <time.h>
 
-#define FONT_WIDTH  0.6
-#define FONT_HEIGHT 0.68
-
-#define WIDTH_HEIGHT_RATIO 0.6
-
-#define HEIGHT 256
-#define WIDTH  (HEIGHT * WIDTH_HEIGHT_RATIO)
-#define BASE_HEIGHT 60
-
 #define IMG_SIZE 256
-#define MIN_RADIUS 4
+#define MIN_RADIUS 3
 #define MAX_RADIUS 40
 
 #define DBG_ASCII
-/* #define DBG_PNG */
 
 typedef struct {
     uint8_t *data;
@@ -54,17 +43,15 @@ static double distsq(int x0, int y0, int x1, int y1) {
     return x*x + y*y;
 }
 
-
 static inline int min(int a, int b) {
     return a < b ? a : b;
 }
-
 
 // Optimization
 //
 static double cache_greatest_radius;
 
-static double get_filled_radius2(const Img img, int px, int py) {
+static double get_circle(const Img img, int px, int py) {
     // Shortcut
     if (!img.data[px + py*img.stride]) return 0;
 
@@ -87,11 +74,11 @@ static double get_filled_radius2(const Img img, int px, int py) {
     return sqrt(shortest_distsq);
 }
 
-static int find_greatest_radius(const Img img, int *const out_x, int *const out_y) {
+static int find_biggest_circle(const Img img, int *const out_x, int *const out_y) {
     double greatest_radius = 0;
     for (int x = 0; x < img.width; x++) {
         for (int y = 0; y < img.height; y++) {
-            double r = get_filled_radius2(img, x, y);
+            double r = get_circle(img, x, y);
             if (r > greatest_radius) {
                 greatest_radius = r;
                 *out_x = x;
@@ -156,7 +143,7 @@ void display_ascii(Img img) {
         }
         putchar('\n');
     }
-
+    fflush(stdout);
 }
 
 int main2(int argc, char **argv) {
@@ -179,6 +166,9 @@ int main2(int argc, char **argv) {
 
 void fractabubble(const char *glyph, const char *file_name) {
     Img img = rasterize("/usr/share/fonts/liberation-mono/LiberationMono-Regular.ttf", glyph[0], IMG_SIZE);
+#ifdef DBG_ASCII
+    display_ascii(img);
+#endif
 
     FILE *svg = fopen(file_name, "w");
     fprintf(svg, "<?xml version=\"1.0\"?>\n");
@@ -187,12 +177,10 @@ void fractabubble(const char *glyph, const char *file_name) {
     cache_greatest_radius = MAX_RADIUS;
 
     int greatest_radius;
-    while (true) {
-        int x_greatest, y_greatest;
-        greatest_radius = find_greatest_radius(img, &x_greatest, &y_greatest);
-        if (greatest_radius < MIN_RADIUS) break;
+    int x_greatest, y_greatest;
 
-        fprintf(svg, "  <circle cx=\"%d\" cy=\"%d\" r=\"%d\" fill=\"#800080\" />\n", x_greatest, y_greatest, greatest_radius-1);
+    while ((greatest_radius = find_biggest_circle(img, &x_greatest, &y_greatest)) >= MIN_RADIUS) {
+        fprintf(svg, "  <circle cx=\"%d\" cy=\"%d\" r=\"%d\" fill=\"#800080\" />\n", x_greatest, y_greatest, greatest_radius);
 
         // TODO: more optimal algorithm?
         const int p_x = x_greatest, p_y = y_greatest, r = greatest_radius;
@@ -205,11 +193,11 @@ void fractabubble(const char *glyph, const char *file_name) {
         }
 
 #ifdef DBG_ASCII
-        display_ascii(img);
-        fflush(stdout);
-        double seconds = 0.33;
+        double seconds = 0.05;
         struct timespec req = { .tv_nsec = 1e9 * seconds };
         nanosleep(&req, NULL);
+        display_ascii(img);
+        fflush(stdout);
 #endif
 
 
