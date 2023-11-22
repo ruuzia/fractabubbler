@@ -5,9 +5,6 @@
 * What that is is a set of SVG files containing only circles.
 */
 
-// TODO: change script to be a program which only creates a single glyph
-//       the font can then be managed and parallelized by another program
-
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
