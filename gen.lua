@@ -1,4 +1,7 @@
 #!/bin/env lua
+-- Rustum Zia
+-- This script takes in a path to a TTF font file and puts a bunch of glyphs
+-- through the fractabubbler
 
 local b = string.byte
 function exec(s, ...)
@@ -13,7 +16,10 @@ local function item(char, name)
     glyphs[char] = name..".svg"
 end
 
-font_path = arg[1] or "LiberationMono-Regular.ttf"
+local font_path = arg[1] or "fonts/LiberationMono-Regular.ttf"
+
+local font_name = font_path:match("([^/\\]*).ttf$")
+exec("mkdir -p %q", font_name)
 
 item(b" ", "_space")
 item(b".", "_period")
@@ -36,11 +42,11 @@ for c = b'A', b'Z' do item(c, string.char(c)) end
 
 --- Execute ---
 for char, name in pairs(glyphs) do
-    exec("./fractabubbler %q %q %q &", font_path, char, "glyphs/"..name)
+    exec("./fractabubbler %q %q %q &", font_path, char, font_name.."/"..name)
 end
 
 --- Create atlas ---
-local f = assert(io.open("glyphs/atlas", "w"))
+local f = assert(io.open(font_name.."/atlas", "w"))
 for char, name in pairs(glyphs) do
     f:write(string.format("\n%d\n%s\n", char, name))
 end

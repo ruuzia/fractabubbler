@@ -1,8 +1,19 @@
 /*
 * Author: Rustum Zia
-* This script is created to generate fonts that can be easiliy
-* rendered in Bubbl <https://github.com/ruuzia/bubbl>.
-* What that is is a set of SVG files containing only circles.
+* This program is created to generate fonts that can be easiliy
+* rendered using Bubbl <https://github.com/ruuzia/bubbl> objects.
+*
+* The fractabubbler takes in a ttf font and a particular glyph and spits out
+* an svg-conforming file containing only circles. This arrangement of
+* circles of various sizes is designed to mimic the form of the glyph.
+*
+* How does it work?
+* The mechanism and design of the fractabubbler is inspired by fractals such as
+* the Apollonian Gasket <https://en.wikipedia.org/wiki/Apollonian_gasket>.
+* It repeatedly finds the largest circle which can fit within the available space.
+* Computing this position based on the joined Bezier curve segments which a font
+* consists of appears mathematically terrifying. Instead I cheat by rasterizing
+* the glyphs and performing a quadratic search through the bitmap repeatedly.
 */
 
 #include <math.h>
@@ -13,24 +24,26 @@
 #include <string.h>
 #include <time.h>
 
+// TODO: none of these should be hard-coded constants
 #define IMG_SIZE 256
 #define MIN_RADIUS 3
 #define MAX_RADIUS 40
 
 /* #define DBG_ASCII */
 
+/* A greyscale bitmap */
 typedef struct {
     uint8_t *data;
     int stride;
     int width;
     int height;
-} Img;
+} Bitmap;
 
-static inline int is_within_bounds(const Img img, int x, int y) {
+static inline int is_within_bounds(const Bitmap img, int x, int y) {
     return 0 <= x && x < img.width && 0 <= y && y < img.height;
 }
 
-static inline bool point_filled(const Img img, int x, int y) {
+static inline bool point_filled(const Bitmap img, int x, int y) {
     return is_within_bounds(img, x, y) && img.data[x + y * img.stride];
 }
 
@@ -48,7 +61,7 @@ static inline int min(int a, int b) {
 //
 static double cache_greatest_radius;
 
-static double get_circle(const Img img, int px, int py) {
+static double get_circle(const Bitmap img, int px, int py) {
     // Shortcut
     if (!img.data[px + py*img.stride]) return 0;
 
@@ -71,7 +84,7 @@ static double get_circle(const Img img, int px, int py) {
     return sqrt(shortest_distsq);
 }
 
-static int find_biggest_circle(const Img img, int *const out_x, int *const out_y) {
+static int find_biggest_circle(const Bitmap img, int *const out_x, int *const out_y) {
     double greatest_radius = 0;
     for (int x = 0; x < img.width; x++) {
         for (int y = 0; y < img.height; y++) {
@@ -93,11 +106,10 @@ static int find_biggest_circle(const Img img, int *const out_x, int *const out_y
 #include "stb_truetype.h"
 
 #define SIZE (1<<25)
-unsigned char ttf_buffer[SIZE];
+stbtt_fontinfo font;
+uint8_t ttf_buffer[SIZE];
 
-Img rasterize(const char *file_name, int c, int height) {
-    stbtt_fontinfo font;
-
+Bitmap rasterize(const char *file_name, int c, int height) {
     FILE* f = fopen(file_name, "rb");
     assert(f);
 
@@ -123,7 +135,7 @@ Img rasterize(const char *file_name, int c, int height) {
     int baseline = (int) (ascent*scale);
     stbtt_MakeCodepointBitmap(&font, &bitmap[(baseline + y0) * width + x0], x1-x0,y1-y0, width, scale,scale, c);
 
-    return (Img) {
+    return (Bitmap) {
         .data = bitmap,
         .stride = width,
         .width = width,
@@ -131,7 +143,7 @@ Img rasterize(const char *file_name, int c, int height) {
     };
 }
 
-void display_ascii(Img img) {
+void display_ascii(Bitmap img) {
     for (int y = 0; y < img.height; y++) {
         for (int x = 0; x < img.width; x++) {
             int c = " .:*|oO@"[img.data[y*img.stride + x]>>5];
@@ -144,7 +156,7 @@ void display_ascii(Img img) {
 }
 
 void fractabubble(const char *font_path, int glyph, const char *file_name) {
-    Img img = rasterize(font_path, glyph, IMG_SIZE);
+    Bitmap img = rasterize(font_path, glyph, IMG_SIZE);
 #ifdef DBG_ASCII
     display_ascii(img);
 #endif
@@ -201,7 +213,7 @@ int main(int argc, char **argv) {
     }
     int c = atoi(glyph);
     if (!c) {
-        fprintf(stderr, "Error: Please pass glyph as unicode number\n");
+        fprintf(stderr, "Error: Please pass glyph as unicode number (got %s)\n", glyph);
         exit(1);
     }
 
