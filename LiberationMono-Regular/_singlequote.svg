@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<svg width="135" height="256">
+  <circle cx="67" cy="35" r="12" fill="#800080" />
+  <circle cx="67" cy="57" r="11" fill="#800080" />
+  <circle cx="67" cy="77" r="9" fill="#800080" />
+  <circle cx="63" cy="90" r="5" fill="#800080" />
+  <circle cx="71" cy="89" r="4" fill="#800080" />
+</svg>
