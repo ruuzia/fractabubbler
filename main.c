@@ -20,7 +20,7 @@
 #define MIN_RADIUS 3
 #define MAX_RADIUS 40
 
-#define DBG_ASCII
+/* #define DBG_ASCII */
 
 typedef struct {
     uint8_t *data;
@@ -121,7 +121,7 @@ Img rasterize(const char *file_name, int c, int height) {
 
     int x0,y0,x1,y1;
     stbtt_GetCodepointBitmapBox(&font, c, scale, scale, &x0, &y0, &x1, &y1);
-    printf("%d, %d, %d, %d\n", x0, y0, x1, y1);
+    /* printf("%d, %d, %d, %d\n", x0, y0, x1, y1); */
 
     int baseline = (int) (ascent*scale);
     stbtt_MakeCodepointBitmap(&font, &bitmap[(baseline + y0) * width + x0], x1-x0,y1-y0, width, scale,scale, c);
@@ -146,26 +146,8 @@ void display_ascii(Img img) {
     fflush(stdout);
 }
 
-int main2(int argc, char **argv) {
-    stbtt_fontinfo font;
-
-    Img img = rasterize("/usr/share/fonts/liberation-mono/LiberationMono-Regular.ttf", 'a', 32);
-
-    display_ascii(img);
-    
-    /* for (int y = 0; y < h; y++) { */
-    /*     for (int x = 0; x < w; x++) { */
-    /*         printf("%3d ", bitmap[y*w + x]); */
-    /*     } */
-    /*     putchar('\n'); */
-    /* } */
-    /* return 0; */
-    free(img.data);
-    return 0;
-}
-
-void fractabubble(const char *glyph, const char *file_name) {
-    Img img = rasterize("/usr/share/fonts/liberation-mono/LiberationMono-Regular.ttf", glyph[0], IMG_SIZE);
+void fractabubble(const char *font_path, int glyph, const char *file_name) {
+    Img img = rasterize(font_path, glyph, IMG_SIZE);
 #ifdef DBG_ASCII
     display_ascii(img);
 #endif
@@ -207,50 +189,29 @@ void fractabubble(const char *glyph, const char *file_name) {
     fclose(svg);
 }
 
-
-static void addToAtlas(const char *glyph, const char *file_name) {
-    FILE *atlas = fopen("glyphs/atlas", "a");
-    assert(atlas);
-    printf("%s :: %s\n", glyph, file_name);
-    fprintf(atlas, "\n%s\n%s\n", file_name, glyph);
-    fclose(atlas);
-}
-
-static void named(const char *glyph, const char *name) {
-    char file_name[256] = "glyphs/";
-    strcat(file_name, name);
-    strcat(file_name, ".svg");
-    addToAtlas(glyph, file_name);
-    fractabubble(glyph, file_name);
-}
-
-static void literal(char c) {
-    char glyph[] = { c, '\0' };
-    named(glyph, glyph);
-}
-
 int main0(void) {
-    fractabubble("a", "test.svg");
+    fractabubble("/usr/share/fonts/liberation-mono/LiberationMono-Regular.ttf", 'a', "test.svg");
     return 0;
 }
 
-int main(void) {
-    named(" ", "_space");
-    named(".", "_period");
-    named(":", "_colon");
-    named(",", "_comma");
-    named(";", "_semicolon");
-    named("(", "_openparenthesis");
-    named(")", "_closeparenthesis");
-    named("[", "_opensquarebrackets");
-    named("]", "_closesquarebrackets");
-    named("*", "_star");
-    named("!", "_exclamation");
-    named("?", "_question");
-    named("\'", "_singlequote");
-    named("\"", "_doublequote");
-    for (char c = '0'; c <= '9'; c++) literal(c);
-    for (char c = 'a'; c <= 'z'; c++) literal(c);
-    for (char c = 'A'; c <= 'Z'; c++) literal(c);
-    return 0;
+int main(int argc, char **argv) {
+    char *program = *argv++;
+    char *font_path = *argv++;
+    char *glyph = *argv++;
+    if (glyph == NULL) {
+        fprintf(stderr, "Error: Must pass the glyph as a command line argument\n");
+        exit(1);
+    }
+    int c = atoi(glyph);
+    if (!c) {
+        fprintf(stderr, "Error: Please pass glyph as unicode number\n");
+        exit(1);
+    }
+
+    char *file_name = *argv++;
+    if (file_name == NULL) {
+        fprintf(stderr, "Error: Must pass the output file path as a command line argument\n");
+        exit(1);
+    }
+    fractabubble(font_path, c, file_name);
 }
