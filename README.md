@@ -1,5 +1,7 @@
 # The Fractabubbler
 
+![Example](Lora-VariableFont/A.svg)
+
 This program is created to generate fonts that can be easiliy
 rendered using [Bubbl](https://github.com/ruuzia/bubbl) objects.
 
