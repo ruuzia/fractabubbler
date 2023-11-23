@@ -1,3 +1,3 @@
 #!/bin/sh
 
-cc -o fractabubbler main.c -g -lm
+cc -o fractabubbler main.c -g -lm -Wall

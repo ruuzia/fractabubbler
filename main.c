@@ -24,12 +24,24 @@
 #include <string.h>
 #include <time.h>
 
-// TODO: none of these should be hard-coded constants
-#define IMG_SIZE 256
-#define MIN_RADIUS 3
-#define MAX_RADIUS 40
+#define DEFAULT_FINENESS 4
+#define DEFAULT_HEIGHT 256
 
-/* #define DBG_ASCII */
+typedef struct {
+    const char *font;
+    int glyph;
+    const char *output_file;
+
+    // How small (in pixels) the circles can go to
+    // A value of 1 would result in maximum coverage with pixel sized circles
+    // A larger value would result in fewer circles with less detail
+    int fineness;
+
+    // Image height
+    int height;
+
+    bool debug_ascii_display;
+} Program;
 
 /* A greyscale bitmap */
 typedef struct {
@@ -109,7 +121,7 @@ static int find_biggest_circle(const Bitmap img, int *const out_x, int *const ou
 stbtt_fontinfo font;
 uint8_t ttf_buffer[SIZE];
 
-Bitmap rasterize(const char *file_name, int c, int height) {
+Bitmap rasterize_glyph(const char *file_name, int c, int height) {
     FILE* f = fopen(file_name, "rb");
     assert(f);
 
@@ -143,6 +155,14 @@ Bitmap rasterize(const char *file_name, int c, int height) {
     };
 }
 
+Bitmap make_bitmap(const Program program) {
+    return rasterize_glyph(program.font, program.glyph, program.height);
+}
+
+void free_bitmap(Bitmap bitmap) {
+    free(bitmap.data);
+}
+
 void display_ascii(Bitmap img) {
     for (int y = 0; y < img.height; y++) {
         for (int x = 0; x < img.width; x++) {
@@ -155,26 +175,24 @@ void display_ascii(Bitmap img) {
     fflush(stdout);
 }
 
-void fractabubble(const char *font_path, int glyph, const char *file_name) {
-    Bitmap img = rasterize(font_path, glyph, IMG_SIZE);
-#ifdef DBG_ASCII
-    display_ascii(img);
-#endif
+void fractabubble(const Program program, Bitmap img) {
+    if (program.debug_ascii_display) {
+        display_ascii(img);
+    }
 
-    FILE *svg = fopen(file_name, "w");
+    FILE *svg = fopen(program.output_file, "w");
     fprintf(svg, "<?xml version=\"1.0\"?>\n");
     fprintf(svg, "<svg width=\"%d\" height=\"%d\">\n", img.width, img.height);
 
-    cache_greatest_radius = MAX_RADIUS;
+    cache_greatest_radius = img.width/2;
 
     int greatest_radius;
     int x_greatest, y_greatest;
 
-    while ((greatest_radius = find_biggest_circle(img, &x_greatest, &y_greatest)) >= MIN_RADIUS) {
-        fprintf(svg, "  <circle cx=\"%d\" cy=\"%d\" r=\"%d\" fill=\"#800080\" />\n", x_greatest, y_greatest, greatest_radius);
-
-        // TODO: more optimal algorithm?
+    while ((greatest_radius = find_biggest_circle(img, &x_greatest, &y_greatest)) >= program.fineness) {
         const int p_x = x_greatest, p_y = y_greatest, r = greatest_radius;
+
+        fprintf(svg, "  <circle cx=\"%d\" cy=\"%d\" r=\"%d\" fill=\"#800080\" />\n", p_x, p_y, r);
         for (int j = -r; j < r; j++) {
             for (int i = -r; i < r; i++) {
                 if (j*j + i*i < r*r) {
@@ -183,13 +201,13 @@ void fractabubble(const char *font_path, int glyph, const char *file_name) {
             }
         }
 
-#ifdef DBG_ASCII
-        double seconds = 0.05;
-        struct timespec req = { .tv_nsec = 1e9 * seconds };
-        nanosleep(&req, NULL);
-        display_ascii(img);
-        fflush(stdout);
-#endif
+        if (program.debug_ascii_display) {
+            double seconds = 0.1;
+            struct timespec req = { .tv_nsec = 1e9 * seconds };
+            nanosleep(&req, NULL);
+            display_ascii(img);
+            fflush(stdout);
+        }
 
 
     }
@@ -198,29 +216,99 @@ void fractabubble(const char *font_path, int glyph, const char *file_name) {
     fclose(svg);
 }
 
-int main0(void) {
-    fractabubble("/usr/share/fonts/liberation-mono/LiberationMono-Regular.ttf", 'a', "test.svg");
-    return 0;
+static const char *arg0;
+static void usage(int exitcode) {
+    fprintf(stderr, "Usage:\n\t%s --font <file> --glyph <codepoint> --out <output> [--fineness <number>]\n", arg0);
+    fprintf(stderr, "Example:\n\t%s --font fonts/LiberationSans-Regular.ttf --glyph 0x263a --out happy.svg --fineness 3\n", arg0);
+    fprintf(stderr, "Specification:\n");
+    fprintf(stderr, "\t--font <file>\n");
+    fprintf(stderr, "\t\tLocal path to the ttf font file to use.\n");
+    fprintf(stderr, "\t--glyph <codepoint>\n");
+    fprintf(stderr, "\t\tUnicode codepoint to convert in hex (0x prefix), decimal, or octal (0 prefix) form.\n");
+    fprintf(stderr, "\t--out <output>\n");
+    fprintf(stderr, "\t\tOutput SVG file path.\n");
+    fprintf(stderr, "\t[--fineness <number>]\n");
+    fprintf(stderr, "\t\tDefault %d. How small the circles can get (1 = pixel fine).\n", DEFAULT_FINENESS);
+    fprintf(stderr, "\t[--height <number>]\n");
+    fprintf(stderr, "\t\tDefault %d. Height of the image.\n", DEFAULT_HEIGHT);
+    exit(exitcode);
+}
+
+static const char *get_key(const char *item) {
+    assert(item);
+    if (item[0] != '-' || item[1] != '-') {
+        fprintf(stderr, "Error: expected argument starting with dash(es), but got %s\n", item);
+        usage(1);
+    }
+    return &item[2];
+}
+
+static const char *get_string(const char *item) {
+    if (item == NULL) {
+        fprintf(stderr, "Error: missing argument\n");
+        usage(1);
+    }
+    return item;
+}
+
+static int get_number(const char *item) {
+    item = get_string(item);
+    int number = strtol(item, NULL, 0);
+    if (number <= 0) {
+        fprintf(stderr, "Error: expected positive decimal, octol, or hexadecimal literal (got %s)\n", item);
+        usage(1);
+    }
+    return number;
+}
+
+static Program collect_args(char **argv) {
+    arg0 = *argv++;
+    char *item;
+    Program args = {0};
+    args.fineness = DEFAULT_FINENESS;
+    args.height = DEFAULT_HEIGHT;
+    while ((item = *argv++) != NULL) {
+        const char *key = get_key(item);
+        if (strcmp(key, "font") == 0) {
+            args.font = get_string(*argv++);
+        } else if (strcmp(key, "glyph") == 0) {
+            args.glyph = get_number(*argv++);
+        } else if (strcmp(key, "out") == 0) {
+            args.output_file = get_string(*argv++);
+        } else if (strcmp(key, "fineness") == 0) {
+            args.fineness = get_number(*argv++);
+        } else if (strcmp(key, "height") == 0) {
+            args.height = get_number(*argv++);
+        } else if (strcmp(key, "help") == 0) {
+            usage(0);
+        } else if (strcmp(key, "debug-ascii-display") == 0) {
+            args.debug_ascii_display = true;
+        } else {
+            fprintf(stderr, "Error: unknown argument (%s)\n", key);
+            usage(1);
+        }
+    }
+
+    if (args.font == NULL) {
+        fprintf(stderr, "Error: missing font\n");
+        usage(1);
+    }
+    if (args.glyph == 0) {
+        fprintf(stderr, "Error: missing glyph\n");
+        usage(1);
+    }
+    if (args.output_file == NULL) {
+        fprintf(stderr, "Error: missing output file\n");
+        usage(1);
+    }
+
+    return args;
 }
 
 int main(int argc, char **argv) {
-    char *program = *argv++;
-    char *font_path = *argv++;
-    char *glyph = *argv++;
-    if (glyph == NULL) {
-        fprintf(stderr, "Error: Must pass the glyph as a command line argument\n");
-        exit(1);
-    }
-    int c = atoi(glyph);
-    if (!c) {
-        fprintf(stderr, "Error: Please pass glyph as unicode number (got %s)\n", glyph);
-        exit(1);
-    }
-
-    char *file_name = *argv++;
-    if (file_name == NULL) {
-        fprintf(stderr, "Error: Must pass the output file path as a command line argument\n");
-        exit(1);
-    }
-    fractabubble(font_path, c, file_name);
+    (void)argc;
+    const Program program = collect_args(argv);
+    Bitmap bitmap = make_bitmap(program);
+    fractabubble(program, bitmap);
+    free_bitmap(bitmap);
 }

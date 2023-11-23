@@ -10,6 +10,7 @@ function exec(s, ...)
     os.execute(s)
 end
 
+local fonts = {}
 local glyphs = {}
 
 local function item(char, name)
@@ -42,7 +43,7 @@ for c = b'A', b'Z' do item(c, string.char(c)) end
 
 --- Execute ---
 for char, name in pairs(glyphs) do
-    exec("./fractabubbler %q %q %q &", font_path, char, font_name.."/"..name)
+    exec("./fractabubbler --font %q --glyph %q --out %q --height 256 --fineness 4 &", font_path, char, font_name.."/"..name)
 end
 
 --- Create atlas ---
