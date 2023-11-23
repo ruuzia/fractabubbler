@@ -30,8 +30,4 @@
   <circle cx="67" cy="140" r="4" fill="#800080" />
   <circle cx="128" cy="104" r="4" fill="#800080" />
   <circle cx="151" cy="104" r="4" fill="#800080" />
-  <circle cx="11" cy="104" r="3" fill="#800080" />
-  <circle cx="47" cy="170" r="3" fill="#800080" />
-  <circle cx="91" cy="128" r="3" fill="#800080" />
-  <circle cx="135" cy="115" r="3" fill="#800080" />
 </svg>

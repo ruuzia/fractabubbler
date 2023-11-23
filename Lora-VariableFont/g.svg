@@ -38,16 +38,4 @@
   <circle cx="56" cy="250" r="4" fill="#800080" />
   <circle cx="83" cy="103" r="4" fill="#800080" />
   <circle cx="92" cy="136" r="4" fill="#800080" />
-  <circle cx="18" cy="197" r="3" fill="#800080" />
-  <circle cx="17" cy="152" r="3" fill="#800080" />
-  <circle cx="22" cy="208" r="3" fill="#800080" />
-  <circle cx="27" cy="171" r="3" fill="#800080" />
-  <circle cx="74" cy="247" r="3" fill="#800080" />
-  <circle cx="83" cy="157" r="3" fill="#800080" />
-  <circle cx="84" cy="113" r="3" fill="#800080" />
-  <circle cx="92" cy="202" r="3" fill="#800080" />
-  <circle cx="95" cy="222" r="3" fill="#800080" />
-  <circle cx="96" cy="238" r="3" fill="#800080" />
-  <circle cx="100" cy="222" r="3" fill="#800080" />
-  <circle cx="103" cy="101" r="3" fill="#800080" />
 </svg>

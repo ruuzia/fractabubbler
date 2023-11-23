@@ -31,10 +31,4 @@
   <circle cx="46" cy="64" r="4" fill="#800080" />
   <circle cx="63" cy="200" r="4" fill="#800080" />
   <circle cx="137" cy="64" r="4" fill="#800080" />
-  <circle cx="35" cy="73" r="3" fill="#800080" />
-  <circle cx="17" cy="63" r="3" fill="#800080" />
-  <circle cx="29" cy="178" r="3" fill="#800080" />
-  <circle cx="45" cy="195" r="3" fill="#800080" />
-  <circle cx="63" cy="193" r="3" fill="#800080" />
-  <circle cx="118" cy="63" r="3" fill="#800080" />
 </svg>
