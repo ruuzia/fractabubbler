@@ -24,6 +24,7 @@
 #include <string.h>
 #include <time.h>
 
+#define MAX_CIRCLE_RADIUS_PERCENT 0.2
 #define DEFAULT_FINENESS 4
 #define DEFAULT_HEIGHT 256
 
@@ -69,20 +70,18 @@ static inline int min(int a, int b) {
     return a < b ? a : b;
 }
 
-// Optimization
-//
-static double cache_greatest_radius;
+static double last_biggest_circle_radius;
 
 static double get_circle(const Bitmap img, int px, int py) {
     // Shortcut
-    if (!img.data[px + py*img.stride]) return 0;
+    if (img.data[px + py*img.stride] == 0) return 0;
 
     int room_left = px;
     int room_right = img.width - px - 1;
     int room_up = py;
     int room_down = img.height - py - 1;
 
-    const double max_dist = min(min(min(min(cache_greatest_radius, room_left), room_right), room_down), room_up);
+    const double max_dist = min(min(min(min(last_biggest_circle_radius, room_left), room_right), room_down), room_up);
 
     double shortest_distsq = max_dist*max_dist;
     for (int x = px - max_dist; x <= px + max_dist; x++) {
@@ -108,7 +107,7 @@ static int find_biggest_circle(const Bitmap img, int *const out_x, int *const ou
             }
         }
     }
-    cache_greatest_radius = greatest_radius;
+    last_biggest_circle_radius = greatest_radius;
     return greatest_radius;
 }
 
@@ -184,7 +183,7 @@ void fractabubble(const Program program, Bitmap img) {
     fprintf(svg, "<?xml version=\"1.0\"?>\n");
     fprintf(svg, "<svg width=\"%d\" height=\"%d\">\n", img.width, img.height);
 
-    cache_greatest_radius = img.width/2;
+    last_biggest_circle_radius = img.width * MAX_CIRCLE_RADIUS_PERCENT;
 
     int greatest_radius;
     int x_greatest, y_greatest;
