@@ -23,6 +23,9 @@
 #include <assert.h>
 #include <string.h>
 #include <time.h>
+#define STB_TRUETYPE_IMPLEMENTATION  // force following include to generate implementation
+#include "stb_truetype.h"
+
 
 #define MAX_CIRCLE_RADIUS_PERCENT 0.2
 #define DEFAULT_FINENESS 4
@@ -52,54 +55,51 @@ typedef struct {
     int height;
 } Bitmap;
 
-static inline int is_within_bounds(const Bitmap img, int x, int y) {
-    return 0 <= x && x < img.width && 0 <= y && y < img.height;
-}
-
-static inline bool point_filled(const Bitmap img, int x, int y) {
-    return is_within_bounds(img, x, y) && img.data[x + y * img.stride];
-}
-
-static double distsq(int x0, int y0, int x1, int y1) {
-    int x = x1 - x0;
-    int y = y1 - y0;
-    return x*x + y*y;
-}
-
 static inline int min(int a, int b) {
     return a < b ? a : b;
 }
 
-static double last_biggest_circle_radius;
-
-static double get_circle(const Bitmap img, int px, int py) {
-    // Shortcut
-    if (img.data[px + py*img.stride] == 0) return 0;
-
-    int room_left = px;
-    int room_right = img.width - px - 1;
-    int room_up = py;
-    int room_down = img.height - py - 1;
-
-    const double max_dist = min(min(min(min(last_biggest_circle_radius, room_left), room_right), room_down), room_up);
-
-    double shortest_distsq = max_dist*max_dist;
-    for (int x = px - max_dist; x <= px + max_dist; x++) {
-        for (int y = py - max_dist; y <= py + max_dist; y++) {
-            if (img.data[x + y*img.stride]) continue;
-            double d = distsq(x, y, px, py);
-            if (d < shortest_distsq) shortest_distsq = d;
+// Optimized midpoint circle algorithm
+// https://en.wikipedia.org/wiki/Midpoint_circle_algorithm#Jesko's_Method
+static bool is_circle_in_image(Bitmap img, int cx, int cy, int r) {
+    int x = r;  
+    int y = 0;
+    int t1 = r / 16;
+    int t2 = 0;
+    while (y <= x) {
+        if (img.data[(cy + y) * img.stride + (cx + x)] == 0) return false;
+        if (img.data[(cy - y) * img.stride + (cx + x)] == 0) return false;
+        if (img.data[(cy + y) * img.stride + (cx - x)] == 0) return false;
+        if (img.data[(cy - y) * img.stride + (cx - x)] == 0) return false;
+        if (img.data[(cy + x) * img.stride + (cx + y)] == 0) return false;
+        if (img.data[(cy + x) * img.stride + (cx - y)] == 0) return false;
+        if (img.data[(cy - x) * img.stride + (cx + y)] == 0) return false;
+        if (img.data[(cy - x) * img.stride + (cx - y)] == 0) return false;
+        y++;
+        t1 = t1 + y;
+        t2 = t1 - x;
+        if (t2 >= 0) {
+            t1 = t2;
+            x--;
         }
     }
+    return true;
+}
 
-    return sqrt(shortest_distsq);
+static double get_circle(const Bitmap img, int px, int py, int r) {
+    if (px - r < 0 || px + r >= img.width
+        || py - r < 0 || py + r >= img.height) return r-1;
+
+    if (!is_circle_in_image(img, px, py, r)) return r-1;
+
+    return get_circle(img, px, py, r+1);
 }
 
 static int find_biggest_circle(const Bitmap img, int *const out_x, int *const out_y) {
     double greatest_radius = 0;
     for (int x = 0; x < img.width; x++) {
         for (int y = 0; y < img.height; y++) {
-            double r = get_circle(img, x, y);
+            double r = get_circle(img, x, y, 0);
             if (r > greatest_radius) {
                 greatest_radius = r;
                 *out_x = x;
@@ -107,14 +107,9 @@ static int find_biggest_circle(const Bitmap img, int *const out_x, int *const ou
             }
         }
     }
-    last_biggest_circle_radius = greatest_radius;
     return greatest_radius;
 }
 
-
-#include <stdio.h>
-#define STB_TRUETYPE_IMPLEMENTATION  // force following include to generate implementation
-#include "stb_truetype.h"
 
 #define SIZE (1<<25)
 stbtt_fontinfo font;
@@ -182,8 +177,6 @@ void fractabubble(const Program program, Bitmap img) {
     FILE *svg = fopen(program.output_file, "w");
     fprintf(svg, "<?xml version=\"1.0\"?>\n");
     fprintf(svg, "<svg width=\"%d\" height=\"%d\">\n", img.width, img.height);
-
-    last_biggest_circle_radius = img.width * MAX_CIRCLE_RADIUS_PERCENT;
 
     int greatest_radius;
     int x_greatest, y_greatest;
