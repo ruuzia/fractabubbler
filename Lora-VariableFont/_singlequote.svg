@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <svg width="41" height="256">
-  <circle cx="20" cy="65" r="9" fill="#800080" />
-  <circle cx="20" cy="81" r="8" fill="#800080" />
-  <circle cx="20" cy="95" r="7" fill="#800080" />
+  <circle cx="20" cy="65" r="8" fill="#800080" />
+  <circle cx="20" cy="80" r="7" fill="#800080" />
+  <circle cx="20" cy="94" r="7" fill="#800080" />
 </svg>
